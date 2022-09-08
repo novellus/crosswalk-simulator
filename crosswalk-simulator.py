@@ -1,5 +1,6 @@
 import random
 from collections import defaultdict
+from matplotlib import pyplot as plt
 
 
 # bounds for monte carlo'd values
@@ -38,20 +39,20 @@ class traffic_light:
 
     def set_state(self, time):
         # sets signal state based on time passed since simulation start
-        mid_cycle_time = time % (x_signal_duration + y_signal_duration)
+        mid_cycle_time = time % (self.x_signal_duration + self.y_signal_duration)
 
-        if mid_cycle_time < x_signal_duration:  # x-crossing
-            self.state = mid_cycle_time / x_signal_duration
+        if mid_cycle_time < self.x_signal_duration:  # x-crossing
+            self.state = mid_cycle_time / self.x_signal_duration
         else:   # y-crossing
-            self.state = 1 + (mid_cycle_time - x_signal_duration) / y_signal_duration
+            self.state = 1 + (mid_cycle_time - self.x_signal_duration) / self.y_signal_duration
 
         assert 0 <= self.state < 2
 
     def time_to_cross(self, direction, velocity):
         if direction == 'x':
-            return x_length / velocity
+            return self.x_length / velocity
         else:
-            return y_length / velocity
+            return self.y_length / velocity
 
     def current_crossing_direction(self):
         # returns 'x' or 'y'
@@ -110,9 +111,9 @@ class sidewalk_block:
 
     def time_to_cross(self, direction, velocity):
         if direction == 'x':
-            return x_length / velocity
+            return self.x_length / velocity
         else:
-            return y_length / velocity
+            return self.y_length / velocity
 
 
 class pedestrian:
@@ -202,38 +203,39 @@ class city_map:
         # creates a new instance when needed, equating size with preexisting grid-aligned instances, if any
 
         # return existing light segment if it has already been created
-        if self.traffic_light_segments[self.sidewalk_position] is not None:
-            return self.traffic_light_segments[self.sidewalk_position]
+        if self.traffic_light_segments[self.sidewalk_position] is None:
 
-        # create new traffic_light at this sidewalk_position
-        # match size to preexisting grid-aligned traffic_lights attached to this sidewalk_block
-        args = {}
-        if self.sidewalk_position == 'lower_right':
-            if self.traffic_light_segments['lower_left'] is not None:
-                args['y_length'] = self.traffic_light_segments['lower_left'].y_length
-            if self.traffic_light_segments['upper_right'] is not None:
-                args['x_length'] = self.traffic_light_segments['upper_right'].x_length
+            # create new traffic_light at this sidewalk_position
+            # match size to preexisting grid-aligned traffic_lights attached to this sidewalk_block
+            args = {}
+            if self.sidewalk_position == 'lower_right':
+                if self.traffic_light_segments['lower_left'] is not None:
+                    args['y_length'] = self.traffic_light_segments['lower_left'].y_length
+                if self.traffic_light_segments['upper_right'] is not None:
+                    args['x_length'] = self.traffic_light_segments['upper_right'].x_length
 
-        elif self.sidewalk_position == 'upper_right':
-            if self.traffic_light_segments['upper_left'] is not None:
-                args['y_length'] = self.traffic_light_segments['upper_left'].y_length
-            if self.traffic_light_segments['lower_right'] is not None:
-                args['x_length'] = self.traffic_light_segments['lower_right'].x_length
+            elif self.sidewalk_position == 'upper_right':
+                if self.traffic_light_segments['upper_left'] is not None:
+                    args['y_length'] = self.traffic_light_segments['upper_left'].y_length
+                if self.traffic_light_segments['lower_right'] is not None:
+                    args['x_length'] = self.traffic_light_segments['lower_right'].x_length
 
-        elif self.sidewalk_position == 'lower_left':
-            if self.traffic_light_segments['lower_right'] is not None:
-                args['y_length'] = self.traffic_light_segments['lower_right'].y_length
-            if self.traffic_light_segments['upper_left'] is not None:
-                args['x_length'] = self.traffic_light_segments['upper_left'].x_length
+            elif self.sidewalk_position == 'lower_left':
+                if self.traffic_light_segments['lower_right'] is not None:
+                    args['y_length'] = self.traffic_light_segments['lower_right'].y_length
+                if self.traffic_light_segments['upper_left'] is not None:
+                    args['x_length'] = self.traffic_light_segments['upper_left'].x_length
 
-        elif self.sidewalk_position == 'upper_left':
-            if self.traffic_light_segments['upper_right'] is not None:
-                args['y_length'] = self.traffic_light_segments['upper_right'].y_length
-            if self.traffic_light_segments['lower_left'] is not None:
-                args['x_length'] = self.traffic_light_segments['lower_left'].x_length
+            elif self.sidewalk_position == 'upper_left':
+                if self.traffic_light_segments['upper_right'] is not None:
+                    args['y_length'] = self.traffic_light_segments['upper_right'].y_length
+                if self.traffic_light_segments['lower_left'] is not None:
+                    args['x_length'] = self.traffic_light_segments['lower_left'].x_length
 
-        # finally, create the new segment
-        self.traffic_light_segments[self.sidewalk_position] = traffic_light(**args)
+            # finally, create the new segment
+            self.traffic_light_segments[self.sidewalk_position] = traffic_light(**args)
+
+        return self.traffic_light_segments[self.sidewalk_position]
 
 
 class simulation:
@@ -251,12 +253,12 @@ class simulation:
         # logged data
         self.cumulative_time_waiting_at_lights = 0.0
 
-    def simulate(self):
+    def simulate(self, debug=False):
         # checks for end state, executes simulation_step
         while self.city_map.end_reached != True:  # end_reached is 4-state, so explicit equation to True is necessary
-            self.simulation_step()
+            self.simulation_step(debug)
 
-    def simulation_step(self):
+    def simulation_step(self, debug):
         # walks the pedestrian either across one length of a sidewalk, or across a traffic_light
         # tracks time taken in this step
         # demands new city_map segments when needed
@@ -283,8 +285,8 @@ class simulation:
             if self.city_map.end_reached != 'y':
                 # give pedestrian choice to wait for light to change (or cross immediately if able)
                 light = self.city_map.get_current_traffic_light()
-                light.set_state(time)  # update cycle information
-                cross_wait_time = light.time_until_can_cross('y', velocity)
+                light.set_state(self.time)  # update cycle information
+                cross_wait_time = light.time_until_can_cross('y', self.pedestrian.velocity)
 
                 if self.pedestrian.choice_wait_time <= cross_wait_time:
                     self.time += cross_wait_time
@@ -300,8 +302,8 @@ class simulation:
             if self.city_map.end_reached != 'x':
                 # give pedestrian choice to wait for light to change (or cross immediately if able)
                 light = self.city_map.get_current_traffic_light()
-                light.set_state(time)  # update cycle information
-                cross_wait_time = light.time_until_can_cross('x', velocity)
+                light.set_state(self.time)  # update cycle information
+                cross_wait_time = light.time_until_can_cross('x', self.pedestrian.velocity)
 
                 if self.pedestrian.choice_wait_time <= cross_wait_time:
                     self.time += cross_wait_time
@@ -318,9 +320,9 @@ class simulation:
             #     otherwise choose the direction with a shorter wait time
 
             light = self.city_map.get_current_traffic_light()
-            light.set_state(time)  # update cycle information
-            cross_wait_time_x = light.time_until_can_cross('x', velocity)
-            cross_wait_time_y = light.time_until_can_cross('y', velocity)
+            light.set_state(self.time)  # update cycle information
+            cross_wait_time_x = light.time_until_can_cross('x', self.pedestrian.velocity)
+            cross_wait_time_y = light.time_until_can_cross('y', self.pedestrian.velocity)
 
             # choose direction of travel
             if self.city_map.end_reached:
@@ -328,7 +330,7 @@ class simulation:
             else:
                 if cross_wait_time_x <= cross_wait_time_y:
                     direction = 'x'
-                else
+                else:
                     direction = 'y'
 
             # assign destination, cross_wait_time
@@ -366,4 +368,10 @@ class simulation:
 class monte_carlo:
     def __init__(self):
         pass
+
+
+
+if __name__ == '__main__':
+    sim = simulation()
+    sim.simulate(debug=True)
 
