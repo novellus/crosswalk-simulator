@@ -8,7 +8,7 @@ CROSSWALK_LENGTH = (5, 30)  # meters
 CROSSWALK_DURATION = (61, 200)  # seconds. lower bound set to guarantee crossability given WALKING_VELOCITY
 SIDEWALK_LENGTH = (50, 150)  # meters
 WALKING_VELOCITY = (0.5, 5)  # meters / second
-WAIT_TIME = (0, 60)  # seconds
+WAIT_TIME = (0, 250)  # seconds
 GRID_LENGTH = (5, 20)  # number of sidewalk blocks in each dimension of the grid
 
 
@@ -252,6 +252,7 @@ class simulation:
 
         # logged data
         self.cumulative_time_waiting_at_lights = 0.0
+        self.cumulative_lights_waited_at = 0
 
     def simulate(self):
         # checks for end state, executes simulation_step
@@ -291,6 +292,7 @@ class simulation:
                 if self.pedestrian.choice_wait_time <= cross_wait_time:
                     self.time += cross_wait_time
                     self.cumulative_time_waiting_at_lights += cross_wait_time
+                    self.cumulative_lights_waited_at += 1
                     self.cross_traffic_light('y', 'upper_right')
                     return
 
@@ -308,6 +310,7 @@ class simulation:
                 if self.pedestrian.choice_wait_time <= cross_wait_time:
                     self.time += cross_wait_time
                     self.cumulative_time_waiting_at_lights += cross_wait_time
+                    self.cumulative_lights_waited_at += 1
                     self.cross_traffic_light('x', 'upper_right')
                     return
 
@@ -344,6 +347,7 @@ class simulation:
             # wait for crossing availability, and finally execute crossing
             self.time += cross_wait_time
             self.cumulative_time_waiting_at_lights += cross_wait_time
+            self.cumulative_lights_waited_at += 1
             self.cross_traffic_light(direction, destination)
 
 
@@ -367,9 +371,27 @@ class simulation:
 
 class monte_carlo:
     def __init__(self):
-        pass
+        self.log = defaultdict(list)
+
+    def run_simulations(self, n=50):
+        for _ in range(n):
+            # execute simulation
+            sim = simulation()
+            sim.simulate()
+
+            # accumulate data
+            self.log['choice_wait_time'].append(sim.pedestrian.choice_wait_time)
+            self.log['cumulative_time_waiting_per_light'].append(sim.cumulative_time_waiting_at_lights / sim.cumulative_lights_waited_at)
+
+    def plot(self):
+        # plot accumulated data
+        plt.scatter(self.log['choice_wait_time'], self.log['cumulative_time_waiting_per_light'], marker='x', s=2, color='red')
+        plt.xlabel('choice_wait_time')
+        plt.ylabel('cumulative_time_waiting_per_light')
+        plt.show()
 
 
 if __name__ == '__main__':
-    sim = simulation()
-    sim.simulate()
+    mc = monte_carlo()
+    mc. run_simulations(n=1000)
+    mc.plot()
