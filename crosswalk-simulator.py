@@ -253,12 +253,12 @@ class simulation:
         # logged data
         self.cumulative_time_waiting_at_lights = 0.0
 
-    def simulate(self, debug=False):
+    def simulate(self):
         # checks for end state, executes simulation_step
         while self.city_map.end_reached != True:  # end_reached is 4-state, so explicit equation to True is necessary
-            self.simulation_step(debug)
+            self.simulation_step()
 
-    def simulation_step(self, debug):
+    def simulation_step(self):
         # walks the pedestrian either across one length of a sidewalk, or across a traffic_light
         # tracks time taken in this step
         # demands new city_map segments when needed
@@ -370,8 +370,6 @@ class monte_carlo:
         pass
 
 
-
 if __name__ == '__main__':
     sim = simulation()
-    sim.simulate(debug=True)
-
+    sim.simulate()
