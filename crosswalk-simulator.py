@@ -391,7 +391,14 @@ class monte_carlo:
         plt.show()
 
 
+def test_test():
+    # TODO
+    assert 1 == 2
+
+
 if __name__ == '__main__':
     mc = monte_carlo()
-    mc. run_simulations(n=1000)
+    mc.run_simulations(n=1000)
     mc.plot()
+
+# pytest --cov=. crosswalk-simulator.py
