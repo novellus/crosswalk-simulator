@@ -598,8 +598,8 @@ class Tests:
         # test sidewalk crossing
         sim = simulation()
         sim.pedestrian.velocity = 2
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
 
@@ -617,8 +617,8 @@ class Tests:
         # test traffic_light crossing
         sim = simulation()
         sim.pedestrian.velocity = 2
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
 
         sim.city_map.sidewalk_position = 'upper_right'
         light = sim.city_map.get_current_traffic_light()
@@ -643,8 +643,8 @@ class Tests:
         # test simulation_step - upper_left
         sim = simulation()
         sim.pedestrian.velocity = 2
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sb = sim.city_map.sidewalk_segment
@@ -667,8 +667,8 @@ class Tests:
         assert sb == sim.city_map.sidewalk_segment
 
         sim = simulation()
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sb = sim.city_map.sidewalk_segment
         sim.simulation_step()
         assert sim.city_map.sidewalk_position in ['lower_left', 'upper_right']
@@ -679,8 +679,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 99
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'lower_left'
@@ -703,8 +703,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 0
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'lower_left'
@@ -727,8 +727,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 99
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'lower_left'
@@ -752,8 +752,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 99
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'upper_right'
@@ -776,8 +776,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 0
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'upper_right'
@@ -800,8 +800,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 99
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'upper_right'
@@ -825,8 +825,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 99
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'lower_right'
@@ -849,8 +849,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 99
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'lower_right'
@@ -873,8 +873,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 0
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'lower_right'
@@ -897,8 +897,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 0
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'lower_right'
@@ -921,8 +921,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 0
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'lower_right'
@@ -945,8 +945,8 @@ class Tests:
         sim.time = 28
         sim.pedestrian.velocity = 2
         sim.pedestrian.choice_wait_time = 0
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sim.city_map.sidewalk_segment.x_length = 7
         sim.city_map.sidewalk_segment.y_length = 13
         sim.city_map.sidewalk_position = 'lower_right'
@@ -967,8 +967,8 @@ class Tests:
 
         # test simulation
         sim = simulation()
-        sim.city_map.x_length = 3
-        sim.city_map.y_length = 5
+        sim.city_map.length['x'] = 3
+        sim.city_map.length['y'] = 5
         sb = sim.city_map.sidewalk_segment
         sim.simulate()
         assert sb != sim.city_map.sidewalk_segment
