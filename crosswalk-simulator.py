@@ -22,8 +22,18 @@ class traffic_light:
         self.y_length = y_length or self.random_length()
         self.x_signal_duration = x_signal_duration or self.random_signal_duration()
         self.y_signal_duration = y_signal_duration or self.random_signal_duration()
-        self.initial_state = initial_state or self.random_state()
-        self.state = self.initial_state
+
+        initial_state = initial_state or self.random_state()
+        self.state = initial_state
+        self.set_initial_time_offset(initial_state = initial_state)
+
+    def set_initial_time_offset(self, initial_state):
+        # creates relative time offset based on initial_state
+        # only called during initialization or unit testing
+        if initial_state < 1:
+            self.initial_cycle_time = self.x_signal_duration * initial_state
+        else:
+            self.initial_cycle_time = self.x_signal_duration + self.y_signal_duration * (initial_state - 1)
 
     def random_state(self):
         # state in interval [0, 2)
@@ -39,14 +49,13 @@ class traffic_light:
 
     def set_state(self, time):
         # sets signal state based on time passed since simulation start
-        mid_cycle_time = time % (self.x_signal_duration + self.y_signal_duration)
+        mid_cycle_time = (time + self.initial_cycle_time) % (self.x_signal_duration + self.y_signal_duration)
 
         if mid_cycle_time < self.x_signal_duration:  # x-crossing
             self.state = mid_cycle_time / self.x_signal_duration
         else:   # y-crossing
             self.state = 1 + (mid_cycle_time - self.x_signal_duration) / self.y_signal_duration
 
-        assert 0 <= self.state < 2
 
     def time_to_cross(self, direction, velocity):
         if direction == 'x':
@@ -159,12 +168,19 @@ class city_map:
         return random.uniform(*GRID_LENGTH)
 
     def new_sidewalk_block(self, direction):
-        # generates new sidewalk_block in specified direction
+        # generates new sidewalk_block in specified direction, equating one dimension of length with existing sidewalk_block
         # sets sidewalk_position on new block
         # tracks grid size restrictions
         # handles propogation of attached traffic_lights
 
-        self.sidewalk_segment = sidewalk_block()
+        # create new sidewalk_block, matching one side length to adjacent current block
+        args = {}
+        if direction == 'x':
+            args['y_length'] = self.sidewalk_segment.y_length
+        else:
+            args['x_length'] = self.sidewalk_segment.x_length
+
+        self.sidewalk_segment = sidewalk_block(**args)
 
         # update grid position, check for maximum length
         self.grid_position[direction] += 1
@@ -289,11 +305,11 @@ class simulation:
                 light.set_state(self.time)  # update cycle information
                 cross_wait_time = light.time_until_can_cross('y', self.pedestrian.velocity)
 
-                if self.pedestrian.choice_wait_time <= cross_wait_time:
+                if self.pedestrian.would_choose_to_wait_for_light(cross_wait_time):
                     self.time += cross_wait_time
                     self.cumulative_time_waiting_at_lights += cross_wait_time
                     self.cumulative_lights_waited_at += 1
-                    self.cross_traffic_light('y', 'upper_right')
+                    self.cross_traffic_light('y')
                     return
 
             # otherwise go to the remaining corner
@@ -307,11 +323,11 @@ class simulation:
                 light.set_state(self.time)  # update cycle information
                 cross_wait_time = light.time_until_can_cross('x', self.pedestrian.velocity)
 
-                if self.pedestrian.choice_wait_time <= cross_wait_time:
+                if self.pedestrian.would_choose_to_wait_for_light(cross_wait_time):
                     self.time += cross_wait_time
                     self.cumulative_time_waiting_at_lights += cross_wait_time
                     self.cumulative_lights_waited_at += 1
-                    self.cross_traffic_light('x', 'upper_right')
+                    self.cross_traffic_light('x')
                     return
 
             # otherwise go to the remaining corner
@@ -336,37 +352,30 @@ class simulation:
                 else:
                     direction = 'y'
 
-            # assign destination, cross_wait_time
             if direction == 'x':
-                destination = 'lower_left'
                 cross_wait_time = cross_wait_time_x
             else:
-                destination = 'upper_right'
                 cross_wait_time = cross_wait_time_y
 
             # wait for crossing availability, and finally execute crossing
             self.time += cross_wait_time
             self.cumulative_time_waiting_at_lights += cross_wait_time
             self.cumulative_lights_waited_at += 1
-            self.cross_traffic_light(direction, destination)
-
+            self.cross_traffic_light(direction)
 
     def cross_sidewalk(self, direction, destination):
-        # update map position
-        self.city_map.sidewalk_position = destination
-
         # calculate time spent
         self.time += self.city_map.sidewalk_segment.time_to_cross(direction, self.pedestrian.velocity)
 
-    def cross_traffic_light(self, direction, destination):
-        # generate new sidewalk_block
-        self.city_map.new_sidewalk_block(direction)
-
         # update map position
         self.city_map.sidewalk_position = destination
 
+    def cross_traffic_light(self, direction):
         # calculate time spent
         self.time += self.city_map.get_current_traffic_light().time_to_cross(direction, self.pedestrian.velocity)
+
+        # generate new sidewalk_block
+        self.city_map.new_sidewalk_block(direction)
 
 
 class monte_carlo:
@@ -391,9 +400,608 @@ class monte_carlo:
         plt.show()
 
 
-def test_test():
-    # TODO
-    assert 1 == 2
+class Tests:
+    def test_traffic_light(self):
+        light = traffic_light(x_length=3, y_length=5, x_signal_duration=7, y_signal_duration=11, initial_state=0.5)
+
+        assert light.state == 0.5
+        light.set_state(0)
+        assert light.state == 0.5
+        light.set_state(18)
+        assert light.state == 0.5
+        light.set_state(21.5)
+        assert light.state == 1
+
+        light.set_initial_time_offset(initial_state = 0.9)
+        light.set_state(0)
+        assert light.state == 0.9
+
+        light.set_initial_time_offset(initial_state = 1.9)
+        light.set_state(0)
+        assert light.state == 1.9
+
+        light.set_initial_time_offset(initial_state = 0.5)
+        light.set_state(0)
+        assert light.current_crossing_direction() == 'x'
+
+        light.set_initial_time_offset(initial_state = 1.5)
+        light.set_state(0)
+        assert light.current_crossing_direction() == 'y'
+
+        light.set_initial_time_offset(initial_state = 1)
+        light.set_state(0)
+        assert light.current_crossing_direction() == 'y'
+
+        light.set_initial_time_offset(initial_state = 0.5)
+        light.set_state(0)
+
+        assert light.time_to_cross('x', 2) == 1.5
+        assert light.time_to_cross('y', 2) == 2.5
+
+        assert light.current_crossing_direction() == 'x'
+        light.set_state(4.5 + 19*3)
+        assert light.current_crossing_direction() == 'y'
+        light.set_state(16)
+        assert light.current_crossing_direction() == 'x'
+
+        assert light.time_until_switch_directions() == 5.5
+        assert light.time_until_switch_directions_twice() == 16.5
+        light.set_state(4.5)
+        assert light.time_until_switch_directions() == 10
+        assert light.time_until_switch_directions_twice() == 17
+
+        assert light.enough_time_to_cross('y', 1) == True
+        assert light.enough_time_to_cross('y', 0.1) == False
+
+        assert light.time_until_can_cross('y', 1) == 0
+        assert light.time_until_can_cross('x', 1) == 10
+        assert light.time_until_can_cross('y', 0.1) == 17
+
+    def test_sidewalk_block(self):
+        sb = sidewalk_block(x_length=3, y_length=5)
+
+        assert sb.time_to_cross('x', 1) == 3
+        assert sb.time_to_cross('x', 0.5) == 6
+        assert sb.time_to_cross('y', 2.5) == 2
+
+    def test_pedestrian(self):
+        p = pedestrian(velocity=3, choice_wait_time=5)
+
+        assert p.would_choose_to_wait_for_light(3) == True
+        assert p.would_choose_to_wait_for_light(6) == False
+
+    def test_city_map(self):
+        cm = city_map(x_length=3, y_length=5)
+
+        # test initial state
+        assert cm.grid_position['x'] == 1
+        assert cm.grid_position['y'] == 1
+        assert cm.sidewalk_position == 'upper_left'
+        assert cm.end_reached == False
+
+        # test new traffic_lights
+        cm.sidewalk_position = 'upper_right'
+        light_ur = cm.get_current_traffic_light()
+        for loc, segment in cm.traffic_light_segments.items():
+            if loc == 'upper_right':
+                assert segment == light_ur
+            else:
+                assert segment is None
+
+        cm.get_current_traffic_light()
+
+        cm.sidewalk_position = 'lower_left'
+        light_ll = cm.get_current_traffic_light()
+        for loc, segment in cm.traffic_light_segments.items():
+            if loc == 'upper_right':
+                assert segment == light_ur
+            elif loc == 'lower_left':
+                assert segment == light_ll
+            else:
+                assert segment is None
+
+        cm.sidewalk_position = 'upper_left'
+        light_ul = cm.get_current_traffic_light()
+        for loc, segment in cm.traffic_light_segments.items():
+            if loc == 'upper_right':
+                assert segment == light_ur
+            elif loc == 'lower_left':
+                assert segment == light_ll
+            elif loc == 'upper_left':
+                assert segment == light_ul
+            else:
+                assert segment is None
+
+        cm.sidewalk_position = 'lower_right'
+        light_lr = cm.get_current_traffic_light()
+        for loc, segment in cm.traffic_light_segments.items():
+            if loc == 'upper_right':
+                assert segment == light_ur
+            elif loc == 'lower_left':
+                assert segment == light_ll
+            elif loc == 'upper_left':
+                assert segment == light_ul
+            else:
+                assert segment == light_lr
+
+        # test same light lengths
+        assert light_ul.y_length == light_ur.y_length
+        assert light_ur.x_length == light_lr.x_length
+        assert light_lr.y_length == light_ll.y_length
+        assert light_ll.x_length == light_ul.x_length
+
+        # test creating new sidewalk_blocks
+        sb = cm.sidewalk_segment
+        cm.new_sidewalk_block('x')
+
+        sb2 = cm.sidewalk_segment
+        assert sb.y_length == sb2.y_length
+        assert cm.grid_position['x'] == 2
+        assert cm.grid_position['y'] == 1
+
+        assert cm.traffic_light_segments['upper_left'] == light_ur
+        assert cm.traffic_light_segments['lower_left'] == light_lr
+        assert cm.traffic_light_segments['lower_right'] == None
+        assert cm.traffic_light_segments['lower_right'] == None
+
+        cm.new_sidewalk_block('y')
+
+        sb3 = cm.sidewalk_segment
+        assert sb2.x_length == sb3.x_length
+        assert cm.grid_position['x'] == 2
+        assert cm.grid_position['y'] == 2
+
+        assert cm.traffic_light_segments['upper_left'] == light_lr
+        assert cm.traffic_light_segments['lower_left'] == None
+        assert cm.traffic_light_segments['lower_right'] == None
+        assert cm.traffic_light_segments['lower_right'] == None
+
+        # test end_reached
+        assert cm.end_reached == False
+
+        cm.new_sidewalk_block('x')
+        assert cm.end_reached == 'x'
+
+        cm.new_sidewalk_block('y')
+        assert cm.end_reached == 'x'
+        cm.new_sidewalk_block('y')
+        assert cm.end_reached == 'x'
+        cm.new_sidewalk_block('y')
+        assert cm.end_reached == True
+
+        cm = city_map(x_length=5, y_length=3)
+        cm.new_sidewalk_block('y')
+        assert cm.end_reached == False
+        cm.new_sidewalk_block('y')
+        assert cm.end_reached == 'y'
+
+        # test sidewalk position when creating new sidewalk_blocks
+        cm = city_map(x_length=5, y_length=3)
+
+        cm.sidewalk_position = 'upper_right'
+        cm.new_sidewalk_block('y')
+        assert cm.sidewalk_position == 'upper_left'
+
+        cm.sidewalk_position = 'lower_left'
+        cm.new_sidewalk_block('x')
+        assert cm.sidewalk_position == 'upper_left'
+
+        cm.sidewalk_position = 'lower_right'
+        cm.new_sidewalk_block('x')
+        assert cm.sidewalk_position == 'lower_left'
+
+        cm.sidewalk_position = 'lower_right'
+        cm.new_sidewalk_block('y')
+        assert cm.sidewalk_position == 'upper_right'
+
+    def test_simulation(self):
+        # test sidewalk crossing
+        sim = simulation()
+        sim.pedestrian.velocity = 2
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+
+        assert sim.city_map.sidewalk_position == 'upper_left'
+        assert sim.time == 0
+
+        sim.cross_sidewalk('x', 'upper_right')
+        assert sim.city_map.sidewalk_position == 'upper_right'
+        assert sim.time == 3.5
+
+        sim.cross_sidewalk('y', 'lower_right')
+        assert sim.city_map.sidewalk_position == 'lower_right'
+        assert sim.time == 10
+
+        # test traffic_light crossing
+        sim = simulation()
+        sim.pedestrian.velocity = 2
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+
+        sim.city_map.sidewalk_position = 'upper_right'
+        light = sim.city_map.get_current_traffic_light()
+        light.x_length = 7
+        light.y_length = 13
+        sb = sim.city_map.sidewalk_segment
+        sim.cross_traffic_light('x')
+        assert sim.time == 3.5
+        assert sim.city_map.sidewalk_position == 'upper_left'
+        assert sb != sim.city_map.sidewalk_segment
+
+        sim.city_map.sidewalk_position = 'lower_right'
+        light = sim.city_map.get_current_traffic_light()
+        light.x_length = 17
+        light.y_length = 19
+        sb = sim.city_map.sidewalk_segment
+        sim.cross_traffic_light('y')
+        assert sim.time == 13
+        assert sim.city_map.sidewalk_position == 'upper_right'
+        assert sb != sim.city_map.sidewalk_segment
+
+        # test simulation_step - upper_left
+        sim = simulation()
+        sim.pedestrian.velocity = 2
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sb = sim.city_map.sidewalk_segment
+
+        sim.city_map.end_reached = 'y'
+        sim.simulation_step()
+        assert sim.city_map.sidewalk_position == 'upper_right'
+        assert sim.time == 3.5
+        assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_lights_waited_at == 0
+        assert sb == sim.city_map.sidewalk_segment
+
+        sim.city_map.sidewalk_position = 'upper_left'
+        sim.city_map.end_reached = 'x'
+        sim.simulation_step()
+        assert sim.city_map.sidewalk_position == 'lower_left'
+        assert sim.time == 10
+        assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_lights_waited_at == 0
+        assert sb == sim.city_map.sidewalk_segment
+
+        sim = simulation()
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sb = sim.city_map.sidewalk_segment
+        sim.simulation_step()
+        assert sim.city_map.sidewalk_position in ['lower_left', 'upper_right']
+        assert sb == sim.city_map.sidewalk_segment
+
+        # test simulation_step - lower_left
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 99
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'lower_left'
+        sim.city_map.end_reached = 'y'
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 1)
+        sim.simulation_step()
+        assert sb == sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'lower_right'
+        assert sim.time == 31.5
+        assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_lights_waited_at == 0
+
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 0
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'lower_left'
+        sim.city_map.end_reached = False
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 0)
+        sim.simulation_step()
+        assert sb == sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'lower_right'
+        assert sim.time == 31.5
+        assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_lights_waited_at == 0
+
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 99
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'lower_left'
+        sim.city_map.end_reached = False
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 0)
+        sim.simulation_step()
+        assert sb != sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'upper_left'
+        assert sim.time == 50.5
+        assert sim.cumulative_time_waiting_at_lights == 11
+        assert sim.cumulative_lights_waited_at == 1
+
+        # test simulation_step - upper_right
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 99
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'upper_right'
+        sim.city_map.end_reached = 'x'
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 0)
+        sim.simulation_step()
+        assert sb == sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'lower_right'
+        assert sim.time == 34.5
+        assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_lights_waited_at == 0
+
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 0
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'upper_right'
+        sim.city_map.end_reached = False
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 1)
+        sim.simulation_step()
+        assert sb == sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'lower_right'
+        assert sim.time == 34.5
+        assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_lights_waited_at == 0
+
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 99
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'upper_right'
+        sim.city_map.end_reached = False
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 1)
+        sim.simulation_step()
+        assert sb != sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'upper_left'
+        assert sim.time == 54.5
+        assert sim.cumulative_time_waiting_at_lights == 17
+        assert sim.cumulative_lights_waited_at == 1
+
+        # test simulation_step - lower_right
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 99
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'lower_right'
+        sim.city_map.end_reached = 'x'
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 0)
+        sim.simulation_step()
+        assert sb != sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'upper_right'
+        assert sim.time == 50.5
+        assert sim.cumulative_time_waiting_at_lights == 11
+        assert sim.cumulative_lights_waited_at == 1
+
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 99
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'lower_right'
+        sim.city_map.end_reached = 'y'
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 1)
+        sim.simulation_step()
+        assert sb != sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'lower_left'
+        assert sim.time == 54.5
+        assert sim.cumulative_time_waiting_at_lights == 17
+        assert sim.cumulative_lights_waited_at == 1
+
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 0
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'lower_right'
+        sim.city_map.end_reached = False
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 0)
+        sim.simulation_step()
+        assert sb != sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'lower_left'
+        assert sim.time == 37.5
+        assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_lights_waited_at == 1
+
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 0
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'lower_right'
+        sim.city_map.end_reached = False
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 1)
+        sim.simulation_step()
+        assert sb != sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'upper_right'
+        assert sim.time == 39.5
+        assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_lights_waited_at == 1
+
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 0
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'lower_right'
+        sim.city_map.end_reached = False
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 1.9)
+        sim.simulation_step()
+        assert sb != sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'lower_left'
+        assert abs(sim.cumulative_time_waiting_at_lights - 1.7) < 0.00001
+        assert sim.time == 39.2
+        assert sim.cumulative_lights_waited_at == 1
+
+        sim = simulation()
+        sim.time = 28
+        sim.pedestrian.velocity = 2
+        sim.pedestrian.choice_wait_time = 0
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sim.city_map.sidewalk_segment.x_length = 7
+        sim.city_map.sidewalk_segment.y_length = 13
+        sim.city_map.sidewalk_position = 'lower_right'
+        sim.city_map.end_reached = False
+        sb = sim.city_map.sidewalk_segment
+        light = sim.city_map.get_current_traffic_light()
+        light.x_signal_duration = 11
+        light.y_signal_duration = 17
+        light.x_length = 19
+        light.y_length = 23
+        light.set_initial_time_offset(initial_state = 0.9)
+        sim.simulation_step()
+        assert sb != sim.city_map.sidewalk_segment
+        assert sim.city_map.sidewalk_position == 'upper_right'
+        assert sim.time == 40.6
+        assert abs(sim.cumulative_time_waiting_at_lights- 1.1) < 0.00001
+        assert sim.cumulative_lights_waited_at == 1
+
+        # test simulation
+        sim = simulation()
+        sim.city_map.x_length = 3
+        sim.city_map.y_length = 5
+        sb = sim.city_map.sidewalk_segment
+        sim.simulate()
+        assert sb != sim.city_map.sidewalk_segment
+        assert sim.city_map.end_reached == True
+        assert sim.city_map.grid_position['x'] == 3
+        assert sim.city_map.grid_position['y'] == 5
+
+    def test_monte_carlo(self):
+        # check for correct number of outputs, and sanity check bounds
+        for n in [1, 7, 101]:
+            mc = monte_carlo()
+            mc.run_simulations(n=n)
+            assert len(mc.log['choice_wait_time']) == n
+            assert len(mc.log['cumulative_time_waiting_per_light']) == n
+            for x in mc.log['choice_wait_time']:
+                assert WAIT_TIME[0] <= x <= WAIT_TIME[1]
+            for x in mc.log['cumulative_time_waiting_per_light']:
+                assert x <= CROSSWALK_DURATION[1] * 2
+
+    def test_initialization_randoms(self):
+        # TODO execute random init functions, but don't test output
+        # traffic_light()
+        # sidewalk_block()
+        # pedestrian()
+        # city_map()
+        # simulation()
+
+        # TODO
+        # sim.simulate()
+
+        # TODO
+        # mc.plot()
+        pass
 
 
 if __name__ == '__main__':
