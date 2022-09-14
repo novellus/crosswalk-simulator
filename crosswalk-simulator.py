@@ -268,6 +268,7 @@ class simulation:
 
         # logged data
         self.cumulative_time_waiting_at_lights = 0.0
+        self.cumulative_proportion_light_half_cycles_waited_at = 0.0
         self.cumulative_lights_waited_at = 0
 
     def simulate(self):
@@ -308,6 +309,7 @@ class simulation:
                 if self.pedestrian.would_choose_to_wait_for_light(cross_wait_time):
                     self.time += cross_wait_time
                     self.cumulative_time_waiting_at_lights += cross_wait_time
+                    self.cumulative_proportion_light_half_cycles_waited_at += cross_wait_time / light.x_signal_duration
                     self.cumulative_lights_waited_at += 1
                     self.cross_traffic_light('y')
                     return
@@ -326,6 +328,7 @@ class simulation:
                 if self.pedestrian.would_choose_to_wait_for_light(cross_wait_time):
                     self.time += cross_wait_time
                     self.cumulative_time_waiting_at_lights += cross_wait_time
+                    self.cumulative_proportion_light_half_cycles_waited_at += cross_wait_time / light.y_signal_duration
                     self.cumulative_lights_waited_at += 1
                     self.cross_traffic_light('x')
                     return
@@ -354,12 +357,15 @@ class simulation:
 
             if direction == 'x':
                 cross_wait_time = cross_wait_time_x
+                other_signal_duration = light.y_signal_duration
             else:
                 cross_wait_time = cross_wait_time_y
+                other_signal_duration = light.x_signal_duration
 
             # wait for crossing availability, and finally execute crossing
             self.time += cross_wait_time
             self.cumulative_time_waiting_at_lights += cross_wait_time
+            self.cumulative_proportion_light_half_cycles_waited_at += cross_wait_time / other_signal_duration
             self.cumulative_lights_waited_at += 1
             self.cross_traffic_light(direction)
 
@@ -390,13 +396,21 @@ class monte_carlo:
 
             # accumulate data
             self.log['choice_wait_time'].append(sim.pedestrian.choice_wait_time)
-            self.log['cumulative_time_waiting_per_light'].append(sim.cumulative_time_waiting_at_lights / sim.cumulative_lights_waited_at)
+            self.log['average_time_waiting_per_light'].append(sim.cumulative_time_waiting_at_lights / sim.cumulative_lights_waited_at)
+            self.log['average_proportion_light_half_cycles_waited_at'].append(sim.cumulative_proportion_light_half_cycles_waited_at / sim.cumulative_lights_waited_at)
 
     def plot(self):
         # plot accumulated data
-        plt.scatter(self.log['choice_wait_time'], self.log['cumulative_time_waiting_per_light'], marker='x', s=2, color='red')
+        plt.figure()
+        plt.scatter(self.log['choice_wait_time'], self.log['average_time_waiting_per_light'], marker='x', s=2, color='red')
         plt.xlabel('choice_wait_time')
-        plt.ylabel('cumulative_time_waiting_per_light')
+        plt.ylabel('average_time_waiting_per_light')
+
+        plt.figure()
+        plt.scatter(self.log['choice_wait_time'], self.log['average_proportion_light_half_cycles_waited_at'], marker='x', s=2, color='blue')
+        plt.xlabel('choice_wait_time')
+        plt.ylabel('average_proportion_light_half_cycles_waited_at')
+
         plt.show()
 
 
@@ -654,6 +668,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'upper_right'
         assert sim.time == 3.5
         assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 0
         assert sim.cumulative_lights_waited_at == 0
         assert sb == sim.city_map.sidewalk_segment
 
@@ -663,6 +678,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'lower_left'
         assert sim.time == 10
         assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 0
         assert sim.cumulative_lights_waited_at == 0
         assert sb == sim.city_map.sidewalk_segment
 
@@ -697,6 +713,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'lower_right'
         assert sim.time == 31.5
         assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 0
         assert sim.cumulative_lights_waited_at == 0
 
         sim = simulation()
@@ -721,6 +738,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'lower_right'
         assert sim.time == 31.5
         assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 0
         assert sim.cumulative_lights_waited_at == 0
 
         sim = simulation()
@@ -745,6 +763,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'upper_left'
         assert sim.time == 50.5
         assert sim.cumulative_time_waiting_at_lights == 11
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 1
         assert sim.cumulative_lights_waited_at == 1
 
         # test simulation_step - upper_right
@@ -770,6 +789,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'lower_right'
         assert sim.time == 34.5
         assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 0
         assert sim.cumulative_lights_waited_at == 0
 
         sim = simulation()
@@ -794,6 +814,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'lower_right'
         assert sim.time == 34.5
         assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 0
         assert sim.cumulative_lights_waited_at == 0
 
         sim = simulation()
@@ -818,6 +839,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'upper_left'
         assert sim.time == 54.5
         assert sim.cumulative_time_waiting_at_lights == 17
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 1
         assert sim.cumulative_lights_waited_at == 1
 
         # test simulation_step - lower_right
@@ -843,6 +865,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'upper_right'
         assert sim.time == 50.5
         assert sim.cumulative_time_waiting_at_lights == 11
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 1
         assert sim.cumulative_lights_waited_at == 1
 
         sim = simulation()
@@ -867,6 +890,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'lower_left'
         assert sim.time == 54.5
         assert sim.cumulative_time_waiting_at_lights == 17
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 1
         assert sim.cumulative_lights_waited_at == 1
 
         sim = simulation()
@@ -891,6 +915,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'lower_left'
         assert sim.time == 37.5
         assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 0
         assert sim.cumulative_lights_waited_at == 1
 
         sim = simulation()
@@ -915,6 +940,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'upper_right'
         assert sim.time == 39.5
         assert sim.cumulative_time_waiting_at_lights == 0
+        assert sim.cumulative_proportion_light_half_cycles_waited_at == 0
         assert sim.cumulative_lights_waited_at == 1
 
         sim = simulation()
@@ -938,6 +964,7 @@ class Tests:
         assert sb != sim.city_map.sidewalk_segment
         assert sim.city_map.sidewalk_position == 'lower_left'
         assert abs(sim.cumulative_time_waiting_at_lights - 1.7) < 0.00001
+        assert abs(sim.cumulative_proportion_light_half_cycles_waited_at - 0.1) < 0.00001
         assert sim.time == 39.2
         assert sim.cumulative_lights_waited_at == 1
 
@@ -963,6 +990,7 @@ class Tests:
         assert sim.city_map.sidewalk_position == 'upper_right'
         assert sim.time == 40.6
         assert abs(sim.cumulative_time_waiting_at_lights- 1.1) < 0.00001
+        assert abs(sim.cumulative_proportion_light_half_cycles_waited_at - 0.1) < 0.00001
         assert sim.cumulative_lights_waited_at == 1
 
         # test simulation
@@ -982,11 +1010,14 @@ class Tests:
             mc = monte_carlo()
             mc.run_simulations(n=n)
             assert len(mc.log['choice_wait_time']) == n
-            assert len(mc.log['cumulative_time_waiting_per_light']) == n
+            assert len(mc.log['average_time_waiting_per_light']) == n
+            assert len(mc.log['average_proportion_light_half_cycles_waited_at']) == n
             for x in mc.log['choice_wait_time']:
                 assert WAIT_TIME[0] <= x <= WAIT_TIME[1]
-            for x in mc.log['cumulative_time_waiting_per_light']:
+            for x in mc.log['average_time_waiting_per_light']:
                 assert x <= CROSSWALK_DURATION[1] * 2
+            for x in mc.log['average_proportion_light_half_cycles_waited_at']:
+                assert 0 <= x <= CROSSWALK_DURATION[1] * 2 / CROSSWALK_DURATION[0]
 
     def test_initialization_randoms(self):
         # TODO execute random init functions, but don't test output
@@ -997,16 +1028,14 @@ class Tests:
         # simulation()
 
         # TODO
-        # sim.simulate()
-
-        # TODO
         # mc.plot()
         pass
 
 
 if __name__ == '__main__':
     mc = monte_carlo()
-    mc.run_simulations(n=1000)
+    # mc.run_simulations(n=1000)
+    mc.run_simulations(n=100000)
     mc.plot()
 
 # pytest --cov=. crosswalk-simulator.py
