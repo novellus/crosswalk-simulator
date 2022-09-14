@@ -411,6 +411,8 @@ class monte_carlo:
         plt.xlabel('choice_wait_time')
         plt.ylabel('average_proportion_light_half_cycles_waited_at')
 
+        # TODO 2D kernel density plot
+
         plt.show()
 
 
